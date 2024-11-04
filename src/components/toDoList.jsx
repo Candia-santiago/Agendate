@@ -55,7 +55,7 @@ function ToDoList() {
     const newTodos = todoArray.filter(todo => todo.id !== id);
     setTodoArray(newTodos);
   };
-
+  
   const estadoDeTareas = (id) => {
     const newTodo = [...todoArray];
     let todo = newTodo.find(todo => todo.id === id);

@@ -9,12 +9,11 @@ import MyCalendar from './components/calendar';
 
 function App() {
   const [todoArray, setTodoArray] = useState([]);
-
   return (
     <div className="App">
       <h1>Agendate</h1>
-      <ToDoList setTodoArray={setTodoArray} todoArray={todoArray} ></ToDoList>
-      <MyCalendar todoArray={todoArray}></MyCalendar>   
+      <ToDoList setTodoArray={setTodoArray} todoArray={todoArray} />
+      <MyCalendar todoArray={todoArray} />
     </div>
   );
 }
