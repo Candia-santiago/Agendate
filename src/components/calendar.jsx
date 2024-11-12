@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import moment from 'moment';
+import 'moment/locale/es'; // Importar el idioma español
 import { Modal, Button, Form, Alert } from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import localforage from 'localforage';
 
+moment.locale('es'); // Establecer el idioma español para Moment.js
 const localizer = momentLocalizer(moment);
 
 function MyCalendar({ todoArray }) {
@@ -14,8 +16,10 @@ function MyCalendar({ todoArray }) {
   const [editMode, setEditMode] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", start: new Date(), end: new Date(), category: "General" });
   const [showNotification, setShowNotification] = useState(null);
+  const [error, setError] = useState(null);
 
-  // Configurar el almacenamiento en `localforage`
+  const normalizeDate = (date) => moment(date).startOf('day').toDate();
+
   useEffect(() => {
     localforage.config({
       name: 'calendarApp',
@@ -23,24 +27,21 @@ function MyCalendar({ todoArray }) {
     });
   }, []);
 
-  // Cargar eventos desde `localForage` y mezclar con todoArray al iniciar
   useEffect(() => {
     const loadEvents = async () => {
       const storedEvents = await localforage.getItem('calendarEvents') || [];
       const todoEvents = todoArray.map(todo => ({
         title: todo.titulo,
-        start: new Date(todo.fecha),
-        end: new Date(todo.fecha),
-        allDay: false,
+        start: normalizeDate(todo.fecha),
+        end: normalizeDate(todo.fecha),
+        allDay: true,
         category: "To-Do"
       }));
-      const combinedEvents = [...storedEvents, ...todoEvents];
-      setEvents(combinedEvents);
+      setEvents([...storedEvents, ...todoEvents]);
     };
     loadEvents();
   }, [todoArray]);
 
-  // Guardar eventos en `localForage` cada vez que cambien
   useEffect(() => {
     localforage.setItem('calendarEvents', events).catch((err) => {
       console.error("Error saving to localForage", err);
@@ -49,26 +50,53 @@ function MyCalendar({ todoArray }) {
 
   const handleShow = (edit = false, event = {}) => {
     setEditMode(edit);
-    setNewEvent(event);
+    setNewEvent(edit ? event : { title: "", start: new Date(), end: new Date(), category: "General" });
     setShow(true);
   };
 
   const handleClose = () => {
     setShow(false);
     setEditMode(false);
+    setError(null);
     setNewEvent({ title: "", start: new Date(), end: new Date(), category: "General" });
   };
 
   const handleEventSubmit = () => {
+    const now = new Date();
+    if (newEvent.start < now || newEvent.end < now) {
+      setError("No puedes agregar eventos en fechas u horas pasadas.");
+      return;
+    }
+
+    const normalizedEvent = {
+      ...newEvent,
+      start: normalizeDate(newEvent.start),
+      end: normalizeDate(newEvent.end),
+      allDay: true,
+    };
+
     const updatedEvents = editMode
-      ? events.map(event => (event === newEvent ? newEvent : event))
-      : [...events, { ...newEvent, allDay: false }];
+      ? events.map(event => (event === newEvent ? normalizedEvent : event))
+      : [...events, normalizedEvent];
+
     setEvents(updatedEvents);
     handleClose();
   };
 
   const handleSelectSlot = ({ start, end }) => {
-    setNewEvent({ title: "", start: start, end: end, category: "General" });
+    const now = new Date();
+    if (start < now) {
+      setError("No puedes seleccionar días pasados.");
+      return;
+    }
+
+    setNewEvent({
+      title: "",
+      start: normalizeDate(start),
+      end: normalizeDate(end),
+      category: "General",
+    });
+    setError(null);
     handleShow();
   };
 
@@ -77,7 +105,6 @@ function MyCalendar({ todoArray }) {
     setEvents(updatedEvents);
   };
 
-  // Notificación para eventos próximos
   useEffect(() => {
     const checkUpcomingEvents = () => {
       const now = new Date();
@@ -95,28 +122,54 @@ function MyCalendar({ todoArray }) {
 
   return (
     <div className="container mt-4">
-      {showNotification && <Alert variant="info" onClose={() => setShowNotification(null)} dismissible>{showNotification}</Alert>}
-      
-      <Calendar
-        localizer={localizer}
-        events={events}
-        startAccessor="start"
-        endAccessor="end"
-        style={{ height: 500, width: '100%' }}
-        selectable={true}
-        onSelectEvent={(event) => handleShow(true, event)}
-        onSelectSlot={handleSelectSlot}
-        views={['month', 'week', 'day', 'agenda']}
-        eventPropGetter={(event) => ({
-          style: { backgroundColor: event.category === "Trabajo" ? "#007bff" : event.category === "Personal" ? "#28a745" : "#6c757d" }
-        })}
-      />
+      {showNotification && (
+        <Alert variant="info" onClose={() => setShowNotification(null)} dismissible>
+          {showNotification}
+        </Alert>
+      )}
+
+<Calendar
+  localizer={localizer}
+  events={events}
+  startAccessor="start"
+  endAccessor="end"
+  style={{ height: 500, width: '100%' }}
+  selectable
+  onSelectEvent={(event) => handleShow(true, event)}
+  onSelectSlot={handleSelectSlot}
+  views={['month', 'week', 'day', 'agenda']} // Nombres válidos para las vistas
+  messages={{
+    date: 'Fecha',
+    time: 'Hora',
+    event: 'Evento',
+    allDay: 'Todo el día',
+    week: 'Semana',
+    work_week: 'Semana laboral',
+    day: 'Día',
+    month: 'Mes',
+    previous: 'Anterior',
+    next: 'Siguiente',
+    yesterday: 'Ayer',
+    tomorrow: 'Mañana',
+    today: 'Hoy',
+    agenda: 'Agenda',
+    noEventsInRange: 'No hay eventos en este rango.',
+    showMore: total => `+ Ver más (${total})`,
+  }}
+  eventPropGetter={(event) => ({
+    style: {
+      backgroundColor: event.category === "Trabajo" ? "#007bff" : event.category === "Personal" ? "#28a745" : "#6c757d"
+    }
+  })}
+/>
+
 
       <Modal show={show} onHide={handleClose}>
         <Modal.Header closeButton>
           <Modal.Title>{editMode ? "Editar evento" : "Agregar nuevo evento"}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
+          {error && <Alert variant="danger">{error}</Alert>}
           <Form>
             <Form.Group controlId="formBasicTitle">
               <Form.Label>Título</Form.Label>
@@ -131,6 +184,7 @@ function MyCalendar({ todoArray }) {
               <Form.Label>Fecha y hora de inicio</Form.Label>
               <Form.Control
                 type="datetime-local"
+                min={moment().format("YYYY-MM-DDTHH:mm")}
                 value={moment(newEvent.start).format("YYYY-MM-DDTHH:mm")}
                 onChange={(e) => setNewEvent({ ...newEvent, start: new Date(e.target.value) })}
               />
@@ -139,6 +193,7 @@ function MyCalendar({ todoArray }) {
               <Form.Label>Fecha y hora de finalización</Form.Label>
               <Form.Control
                 type="datetime-local"
+                min={moment().format("YYYY-MM-DDTHH:mm")}
                 value={moment(newEvent.end).format("YYYY-MM-DDTHH:mm")}
                 onChange={(e) => setNewEvent({ ...newEvent, end: new Date(e.target.value) })}
               />
