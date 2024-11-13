@@ -18,7 +18,7 @@ function MyCalendar({ todoArray }) {
   const [showNotification, setShowNotification] = useState(null);
   const [error, setError] = useState(null);
 
-  const normalizeDate = (date) => moment(date).startOf('day').toDate();
+  const normalizeDate = (date) => moment(date).toDate(); // Mantener la hora al momento de convertir
 
   useEffect(() => {
     localforage.config({
@@ -34,7 +34,6 @@ function MyCalendar({ todoArray }) {
         title: todo.titulo,
         start: normalizeDate(todo.fecha),
         end: normalizeDate(todo.fecha),
-        allDay: true,
         category: "To-Do"
       }));
       setEvents([...storedEvents, ...todoEvents]);
@@ -50,7 +49,7 @@ function MyCalendar({ todoArray }) {
 
   const handleShow = (edit = false, event = {}) => {
     setEditMode(edit);
-    setNewEvent(edit ? event : { title: "", start: new Date(), end: new Date(), category: "General" });
+    setNewEvent(edit ? { ...event } : { title: "", start: new Date(), end: new Date(), category: "General" });
     setShow(true);
   };
 
@@ -70,14 +69,19 @@ function MyCalendar({ todoArray }) {
 
     const normalizedEvent = {
       ...newEvent,
-      start: normalizeDate(newEvent.start),
-      end: normalizeDate(newEvent.end),
-      allDay: true,
+      start: moment(newEvent.start).toDate(), // Aseguramos que la fecha y hora se guarden correctamente
+      end: moment(newEvent.end).toDate(), // Lo mismo para el evento final
     };
 
-    const updatedEvents = editMode
-      ? events.map(event => (event === newEvent ? normalizedEvent : event))
-      : [...events, normalizedEvent];
+    let updatedEvents;
+
+    if (editMode) {
+      updatedEvents = events.map(event =>
+        event.title === newEvent.title && event.start === newEvent.start ? normalizedEvent : event
+      );
+    } else {
+      updatedEvents = [...events, normalizedEvent];
+    }
 
     setEvents(updatedEvents);
     handleClose();
@@ -92,8 +96,8 @@ function MyCalendar({ todoArray }) {
 
     setNewEvent({
       title: "",
-      start: normalizeDate(start),
-      end: normalizeDate(end),
+      start: moment(start).toDate(), // Mantener la hora seleccionada
+      end: moment(end).toDate(), // Mantener la hora de fin seleccionada
       category: "General",
     });
     setError(null);
@@ -128,41 +132,42 @@ function MyCalendar({ todoArray }) {
         </Alert>
       )}
 
-<Calendar
-  localizer={localizer}
-  events={events}
-  startAccessor="start"
-  endAccessor="end"
-  style={{ height: 500, width: '100%' }}
-  selectable
-  onSelectEvent={(event) => handleShow(true, event)}
-  onSelectSlot={handleSelectSlot}
-  views={['month', 'week', 'day', 'agenda']} // Nombres válidos para las vistas
-  messages={{
-    date: 'Fecha',
-    time: 'Hora',
-    event: 'Evento',
-    allDay: 'Todo el día',
-    week: 'Semana',
-    work_week: 'Semana laboral',
-    day: 'Día',
-    month: 'Mes',
-    previous: 'Anterior',
-    next: 'Siguiente',
-    yesterday: 'Ayer',
-    tomorrow: 'Mañana',
-    today: 'Hoy',
-    agenda: 'Agenda',
-    noEventsInRange: 'No hay eventos en este rango.',
-    showMore: total => `+ Ver más (${total})`,
-  }}
-  eventPropGetter={(event) => ({
-    style: {
-      backgroundColor: event.category === "Trabajo" ? "#007bff" : event.category === "Personal" ? "#28a745" : "#6c757d"
-    }
-  })}
-/>
-
+      <Calendar
+        localizer={localizer}
+        events={events}
+        startAccessor="start"
+        endAccessor="end"
+        style={{ height: 500, width: '100%' }}
+        selectable
+        onSelectEvent={(event) => handleShow(true, event)}
+        onSelectSlot={handleSelectSlot}
+        views={['month', 'week', 'day', 'agenda']} // Nombres válidos para las vistas
+        messages={{
+          date: 'Fecha',
+          time: 'Hora',
+          event: 'Evento',
+          allDay: 'Todo el día',
+          week: 'Semana',
+          work_week: 'Semana laboral',
+          day: 'Día',
+          month: 'Mes',
+          previous: 'Anterior',
+          next: 'Siguiente',
+          yesterday: 'Ayer',
+          tomorrow: 'Mañana',
+          today: 'Hoy',
+          agenda: 'Agenda',
+          noEventsInRange: 'No hay eventos en este rango.',
+          showMore: total => `+ Ver más (${total})`,
+        }}
+        eventPropGetter={(event) => ({
+          style: {
+            backgroundColor: event.category === "Trabajo" ? "#007bff" : event.category === "Personal" ? "#28a745" : 
+                        event.category === "Estudio" ? "#f39c12" : event.category === "Domestico" ? "#e74c3c" :
+                        event.category === "To-Do" ? "#9b59b6" : "#6c757d"
+          }
+        })}
+      />
 
       <Modal show={show} onHide={handleClose}>
         <Modal.Header closeButton>
@@ -208,14 +213,20 @@ function MyCalendar({ todoArray }) {
                 <option value="General">General</option>
                 <option value="Trabajo">Trabajo</option>
                 <option value="Personal">Personal</option>
+                <option value="Estudio">Estudio</option>
+                <option value="Doméstico">Doméstico</option>
+                <option value="To-Do">To-Do</option>
               </Form.Control>
             </Form.Group>
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          {editMode && <Button variant="danger" onClick={() => handleDeleteEvent(newEvent)}>Eliminar</Button>}
-          <Button variant="secondary" onClick={handleClose}>Cancelar</Button>
-          <Button variant="primary" onClick={handleEventSubmit}>Guardar evento</Button>
+          <Button variant="secondary" onClick={handleClose}>
+            Cerrar
+          </Button>
+          <Button variant="primary" onClick={handleEventSubmit}>
+            Guardar
+          </Button>
         </Modal.Footer>
       </Modal>
     </div>
